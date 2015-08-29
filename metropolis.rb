@@ -1,39 +1,20 @@
 #!/usr/bin/ruby
 
-require 'pp'
+require './cubic_lattice'
 include Math
 
-class CubicLattice
-  def initialize max
-    @max = max
-    @coord = [-1,0,0]
-  end
-  def increment i
-    @coord[i] += 1
-    if @coord[i] >= @max
-      @coord[i] = 0
-      increment i+1
-    end
-  end
-  def next
-    increment 0
-    @coord
-  end
-end
-
 class Simulator
-  attr_accessor :box_size
+  attr_accessor :box_len, :n_atoms  # box length and number of atoms
 
-  def initialize(energy_cal, eq_move, pro_move)
+  def initialize(energy_cal, eq_move: 300, pro_move: 300, n_atoms: 100, box_len: 50)
     @equilibrate_move = eq_move
     @production_move = pro_move
-
-    @n_atoms = 100  # number of atoms
-    @box_size = 40  # box size (amstrong)
+    @n_atoms = n_atoms  # number of particles
+    @box_len = box_len  # box length in amstrong
 
     @energy_cal = energy_cal.new(self)
 
-    @max_translate = 0.4  # atom max translation angstroms
+    @max_translate = 5  # atom max translation angstroms
 
     @kT = 1.987206504191549e-3 * 298.15   # Simulation temperature * k (kcal mol-1 K-1)
 
@@ -44,7 +25,7 @@ class Simulator
     @particles = []
 
     atom_per_axis = (@n_atoms**(1.0/3)).ceil
-    spacing = @box_size.to_f / atom_per_axis
+    spacing = @box_len.to_f / atom_per_axis
 
     coord = CubicLattice.new(atom_per_axis)
     @n_atoms.times do
@@ -68,6 +49,11 @@ class Simulator
     @energy_cal.updateall(@energy_grid, @particles)
     @energy = @energy_grid.each_value.reduce :+
 
+    @logfile = open('metropolis.log', 'w')
+  end
+
+  def verbose
+    alias custom_update verbose_update
   end
 
   def run
@@ -77,23 +63,31 @@ class Simulator
     puts "perform #@production_move steps for production"
     print "%-13s: %-10s %-10s\n" % ['move number', 'energy', 'acceptance']
 
-    accumulate_vol = 0
-    @production_move.times do |n_trial|
+    1.upto(@production_move) do |n_trial|
       try_move
-      accumulate_vol += @box_size**3
       if n_trial % 10 == 0
         print "%-13d: %-10.2f %-10s\n" % [n_trial, @energy, (@n_accept*100/(@n_reject+@n_accept)).to_s + '%']
       end
-      # print_pdb n_trial if n_trial % 100 == 0
+      custom_update n_trial
     end
-    puts "=" * 40
-    puts "mean volume: #{accumulate_vol/@production_move}"
+
+    summary
+  end
+
+  def custom_update(n_trial); end
+  def summary; end
+
+  def verbose_update(n_trial)
+    print_pdb n_trial if n_trial % 100 == 0
   end
 
   def try_move
-    if test_move
+    move_prob, type = test_move()
+    if rand < move_prob
+      @logfile.puts "accept #{type}"
       @n_accept += 1
     else
+      @logfile.puts "reject #{type}"
       @n_reject += 1
       restore_state
     end
@@ -108,8 +102,8 @@ class Simulator
     @backup = [:trans, i, atom_backup(i)]
     @particles[i].each_index do |j|
       @particles[i][j] += rand((-@max_translate)..@max_translate)
-      if not (0..@box_size).cover? @particles[i][j]
-        @particles[i][j] %= @box_size
+      if not (0..@box_len).cover? @particles[i][j]
+        @particles[i][j] %= @box_len
       end
     end
     @energy_cal.update_ith(@energy_grid, @particles, i)
@@ -133,7 +127,7 @@ class Simulator
       @particles.each do |p|
         p.each_index {|i| p[i] /= scale }
       end
-      @box_size /= scale
+      @box_len /= scale
     end
     @energy_cal.updateall(@energy_grid, @particles)
     @energy = @energy_grid.each_value.reduce :+
@@ -141,7 +135,7 @@ class Simulator
 
   def print_pdb(nth)
     open("output%06d.pdb" % nth, 'w') do |out|
-      out.printf("CRYST1 %8.3f %8.3f %8.3f  90.00  90.00  90.00\n", @box_size, @box_size, @box_size)
+      out.printf("CRYST1 %8.3f %8.3f %8.3f  90.00  90.00  90.00\n", @box_len, @box_len, @box_len)
       @particles.each_with_index do |p, i|
         out.printf("ATOM  %5d  Kr   Kr     1    %8.3f%8.3f%8.3f  1.00  0.00          Kr\n",
                    i, p[0], p[1], p[2])
@@ -156,9 +150,8 @@ class SimulatorNVT < Simulator
     old_E = @energy
     translation_move
     new_E = @energy
-    new_E <= old_E or exp(-(1/@kT)*(new_E - old_E)) >= rand
+    [new_E <= old_E ? 1 : exp(-(1/@kT)*(new_E - old_E)), "translation"]
   end
-
 end
 
 class SimulatorNPT < Simulator
@@ -166,46 +159,41 @@ class SimulatorNPT < Simulator
 
   def test_move
     old_E = @energy
-    type = rand < 0.9 ? :trans : :vol
-    if type == :trans
+    type = rand < 0.9 ? "translation" : "volume"
+    if type == "translation"
       translation_move
     else
-      old_vol = @box_size ** 3
+      old_vol = @box_len ** 3
       volume_move
-      new_vol = @box_size ** 3
+      new_vol = @box_len ** 3
     end
     new_E = @energy
 
-    vol_factor = (type == :trans) ? 0 : -(1/@kT)*@pressure*(new_vol-old_vol) + (@n_atoms+1)*log(new_vol/old_vol)
-    # puts "new_E: #{new_E} old_E: #{old_E} vol_factor: #{vol_factor}"
+    vol_factor = (type == "translation") ? 0 : -(1/@kT)*@pressure*(new_vol-old_vol) + (@n_atoms+1)*log(new_vol/old_vol)
 
-    tmp = exp(-(1/@kT)*(new_E - old_E) + vol_factor) >= rand
-    if type != :trans
-      if tmp == true
-        puts "accept volume move: deltaE #{new_E-old_E}, vol_factor: #{vol_factor}"
-      else
-        # puts "exp(-(1/@kT)*(new_E - old_E) + vol_factor) = #{exp(-(1/@kT)*(new_E - old_E) + vol_factor)}"
-        # puts "(@n_atoms+1)*log(new_vol/old_vol) = #{(@n_atoms+1)*log(new_vol/old_vol)}"
-        # puts "-(1/@kT)*@pressure*(new_vol-old_vol) = #{-(1/@kT)*@pressure*(new_vol-old_vol)}"
-        puts "reject volume move: deltaE #{new_E-old_E}, vol_factor: #{vol_factor}"
-      end
+    type += " with deltaE: #{new_E-old_E}" if type == "volume"
+
+    [exp(-(1/@kT)*(new_E - old_E) + vol_factor), type]
+
+=begin
+    if type == "translation"
+      puts "#{is_ok ? 'accept' : 'reject'} translation move"
     else
-      if tmp == true
-        puts "accept translation move"
-      else
-        puts "reject translation move"
-      end
+      puts "#{is_ok ? 'accept' : 'reject'} volume move: deltaE #{new_E-old_E}"
+      # puts "exp(-(1/@kT)*(new_E - old_E) + vol_factor) = #{exp(-(1/@kT)*(new_E - old_E) + vol_factor)}"
+      # puts "(@n_atoms+1)*log(new_vol/old_vol) = #{(@n_atoms+1)*log(new_vol/old_vol)}"
+      # puts "-(1/@kT)*@pressure*(new_vol-old_vol) = #{-(1/@kT)*@pressure*(new_vol-old_vol)}"
     end
-    tmp
+=end
   end
 
   def volume_move
-    delta_vol = 1
-    @old_size = @box_size
-    new_vol = exp(log(@box_size**3) + (rand-0.5) * delta_vol)
-    @box_size = new_vol**(1.0/3)
-    scale = (@box_size/@old_size)
-    puts "scaling: #{scale}"
+    delta_vol = 1.5
+    @old_size = @box_len
+    new_vol = exp(log(@box_len**3) + (rand-0.5) * delta_vol)
+    @box_len = new_vol**(1.0/3)
+    scale = (@box_len/@old_size)
+    @logfile.puts "scaling: #{scale}"
     @backup = [:vol, scale]
 
     @particles.each do |p|
@@ -214,14 +202,25 @@ class SimulatorNPT < Simulator
     @energy_cal.updateall(@energy_grid, @particles)
     @energy = @energy_grid.each_value.reduce :+
   end
+
+  def custom_update(n_trial)
+    super
+    @accumulate_vol ||= 0
+    @accumulate_vol += @box_len**3
+  end
+
+  def summary
+    puts "final box length: #{@box_len}"
+    puts "mean volume: #{@accumulate_vol/@production_move}"
+  end
 end
 
 class MinImageEnergy
 
   # Give the Lennard Jones parameters for the atoms
   # (these are the OPLS parameters for Krypton)
-  Sigma = 3.624     # angstroms
-  Epsilon = 0.317   # kcal mol-1
+  SIGMA = 3.624     # angstroms
+  EPSILON = 0.317   # kcal mol-1
 
   def initialize host
     @simulator = host
@@ -232,13 +231,13 @@ class MinImageEnergy
   def interaction(p1, p2)
     r_sq = p1.zip(p2).reduce(0) {|sum, coords| sum + (min_img(coords[1] - coords[0]))**2 }
     r = sqrt r_sq
-    4.0 * Epsilon * ( (Sigma/r)**12 - (Sigma/r)**6 )
+    4.0 * EPSILON * ( (SIGMA/r)**12 - (SIGMA/r)**6 )
   end
 
   def min_img(distance)
-    box_size = @simulator.box_size
+    box_len = @simulator.box_len
     distance = distance.abs
-    distance > (0.5*box_size) ? box_size - distance : distance
+    distance > (0.5*box_len) ? box_len - distance : distance
   end
 
   def updateall(energy_grid, particles)
@@ -257,13 +256,18 @@ class MinImageEnergy
   end
 end
 
-equilibrate_move = ARGV[0] || '500'
-production_move = ARGV[1] || '200'
+args = { n_atoms: 100, box_len: 50 }
+args[:eq_move] = ARGV[0].to_i if ARGV[0]
+args[:pro_move] = ARGV[1].to_i if ARGV[1]
 enssemble = ARGV[2] || 'npt'
+verbose = (ARGV[3] == '-v')
 
-simulator_table = {'nvt' => SimulatorNVT, 'npt' => SimulatorNPT}
+SIMULATOR_TABLE = {'nvt' => SimulatorNVT, 'npt' => SimulatorNPT}
 
-sim = simulator_table[enssemble].new(MinImageEnergy, equilibrate_move.to_i, production_move.to_i)
+sim = SIMULATOR_TABLE[enssemble].new(MinImageEnergy, args)
+
+sim.verbose if verbose
+
 if enssemble == 'npt'
   sim.pressure = 1 * 1.458e-5  # kcal mol^-1 A^-3
 end
