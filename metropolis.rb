@@ -1,6 +1,6 @@
 #!/usr/bin/ruby
 
-require './cubic_lattice'
+require_relative 'cubic_lattice'
 include Math
 
 class Simulator
