@@ -40,9 +40,42 @@ Package       : graphicx
 
 # Introduction { #sec-intro }
 
-Molecular dynamics (MD) and Monte Carlo Method (MC) are two commonly used algorithms for computer simulation of molecular system.  They are useful in predicting thermodynamic properties of a system, or understanding biological process.  When the system to be simulated is large in scale, typically exceeding 1000 atoms, efficiency of the simulation program would become an important issue.  Thus efficiency is one of the factors to be considered when researchers decides whether to adopt MD or MC in a study.
+Molecular dynamics (MD) and Monte Carlo method (MC) are two commonly used algorithms for computer simulation of molecular system.  They are useful in predicting thermodynamic properties of a system, or understanding biological process.  When the system to be simulated is large in scale, typically exceeding 1000 atoms, efficiency of the simulation program would become an important issue.  Thus efficiency is one of the factors to be considered when researchers decides whether to adopt MD or MC in a study.
 
-The purpose of this project is to compare the sampling efficiency of MD and MC for simulation of molecules in liquid phase.
+The purpose of this project is to compare the sampling efficiency of MD and MC for simulation of molecules in liquid phase.  There is a similar study by William L. Jorgensen and Julian Tirado-Rives which focus on hexane simulation, which found MC was 2 to 3 times more efficient than MD for achieving conformational equilibrium in the system.  This project takes a different approach in measuring efficiency, and simulates systems with different characteristics.
+
+It is found that the result strongly depends on how long range interaction behaves in the simulated system.  In particular, MD has better sampling efficiency when long range interaction is significant, and needs to be handled accurately.
+
+This report begins with an brief review on molecular simulation, focusing on the working principles of MD and MC.  It is followed by the explanation of the method of study based on simulation of two systems, which are liquid methanol and liquid propane.  The sampling efficiencies are analyzed, and an explanation of the difference in efficiency is given.
+
+# Review on Molecular Simulation
+
+The traditional method to understand a molecular system are either solving the equation of state or performing experiment.  However, in a complicated system, the equation of state is often hard to solve or has no analytical solution.  Experimental study often cannot help us understand the mechanism of a biological process.  Computer simulation is a method to solve this problem.  It also serves to give numerical result to test against a proposed theory.
+
+## Classical Statistical Mechanics
+
+Both MC and MD are based on classical statistical mechanics, which is an approximation to statistical mechanics in a classical system.  The objective simulation is to obtain the average value of a thermodynamic property, such as heat capacity.  A fundamental result of classical statistical mechanics is Equation &stat-mech-avg;, which gives an expression to compute the ensemble average of a thermodynamic property $C$ in a canonical ensemble (constant NVT).
+
+~ Equation { #stat-mech-avg}
+\langle C \rangle = \frac{1}{Z}\int C(\mathbf{p}^N,\mathbf{r}^N)e^{-\beta H(\mathbf{p}^N,\mathbf{r}^N)} d\mathbf{p}^N d\mathbf{r}^N
+~
+,where $H$ is the Hamiltonian which is total energy of the system, $\int d\mathbf{p}^N d\mathbf{r}^N$ represent the integral over whole phase space of $N$ atoms (in other words, the integral over the momentum and position of each atom), and $Z$ is the classical canonical partition function
+~ Equation
+Z = \int e^{-\beta H(\mathbf{p}^N,\mathbf{r}^N)} d\mathbf{p}^N d\mathbf{r}^N
+~
+
+In most systems, equation &stat-mech-avg; cannot be solved analytically.  Monte Carlo method is an approach to obtain an numerical approximation of the integral.  Meanwhile, it has been shown that the ensemble average is equivalent to time average over the evolution of the system.  This is the approach of molecular dynamics.
+
+## Molecular Modeling
+
+The Hamiltonian $H$ in Equation &stat-mech-avg; is the factor which characterize a system to be simulated.  The mathemetical form of $H$ is obtained from the molecular mechanics.  It is assumed that the energy of a molecule is determined by the relative position of the nuclear positions only.  The energy is commonly parameterized by bond length, bonds angle, and bond rotation (torsion), in addition to non-bonded interactions such as electrostatic force.
+
+The interaction energy from each of the above parameters, in different types of molecules, are modeled by functions such as harmonic functions.  The collection of such potential function, called a force field, describe the mechanics of a molecular system.  Some force fields takes united atom approach, modeling carbon and and its bonded hydrogen as one unit to reduce computational complexity.  Some popular force fields are OPLS, AMBER, and CHARMM.
+
+## Molecular Dynamics
+## Monte Carlo Method
+
+# 
 
 # The following are default template
 # Introduction { #iii }
