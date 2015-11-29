@@ -1,25 +1,53 @@
-Title         : My Academic Paper
+Title         : Comparison of Sampling Efficiency of Molecular Simulation
+                with Molecular Dynamics and Monte Carlo Method
 Author        : Chiu Yue Chun
 Affiliation   : The Chinese University of Hong Kong
 Colorizer     : javascript
 Bib style     : plainnat
 Bibliography  : example
-Logo          : True
+Logo          : False
 
-Document class: [5pt]article
+Document class: [15pt, a4paper]report
 Package       : [margin=1in]{geometry}
+Package       : graphicx
 
-[TITLE]
 
-~ Abstract
-There is more in you of good than you know, child of the kindly West.
-Some courage and some wisdom, blended in measure. If more of us valued
-food and cheer and song above hoarded gold, it would be a merrier world.
+~ Snippet
+\begin{titlepage}
+	\centering
+	%\includegraphics[width=0.15\textwidth]{example-image-1x1}\par\vspace{1cm}
+	{\scshape\Huge The Chinese University of Hong Kong \par}
+	\vspace{1cm}
+	{\scshape\Large Final year project\par}
+	\vspace{1.5cm}
+	{\huge\bfseries Comparison of Sampling Efficiency of Molecular Simulation
+                  with Molecular Dynamics and Monte Carlo Method\par}
+  \noindent\rule[0.5ex]{\linewidth}{0.5pt}
+	\vspace{2cm}
+	{\Large\itshape Chiu Yue Chun\par}
+	supervised by\par
+	Prof. Wang Yi
+	\vfill
+
+% Bottom of the page
+	{\large \today\par}
+\end{titlepage}
 ~
 
-# Introduction     { #sec-intro }
+[TOC]
 
-Figure [#fig-butterfly] in Section [#sec-intro] shows a monarch butterfly.
+&pagebreak;
+
+# Introduction { #sec-intro }
+
+Molecular dynamics (MD) and Monte Carlo Method (MC) are two commonly used algorithms for computer simulation of molecular system.  They are useful in predicting thermodynamic properties of a system, or understanding biological process.  When the system to be simulated is large in scale, typically exceeding 1000 atoms, efficiency of the simulation program would become an important issue.  Thus efficiency is one of the factors to be considered when researchers decides whether to adopt MD or MC in a study.
+
+The purpose of this project is to compare the sampling efficiency of MD and MC for simulation of molecules in liquid phase.
+
+# The following are default template
+# Introduction { #iii }
+
+Figure [#fig-butterfly] in Section [#iii] shows a monarch butterfly.
 Note that you can drag&drop images into the editor pane to include them in
 the document, and similarly with bibtex files, latex style files, etc.
 
